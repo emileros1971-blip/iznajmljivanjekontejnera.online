@@ -1087,14 +1087,22 @@ footer{
         <div class="row"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><div><b>Radno vreme</b><span>Svakog dana: 06:00 – 22:00</span></div></div>
         <div class="row"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12a10 10 0 11-20 0 10 10 0 0120 0z"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg><div><b>Područje rada</b><span>Novi Sad i okolina</span></div></div>
       </div>
-      <form class="contact" onsubmit="event.preventDefault();this.querySelector('button').innerText='✔ Poslato — javljamo se uskoro';this.reset();">
-        <div class="row2">
-          <div><label for="ime">Ime</label><input id="ime" name="ime" required placeholder="Vaše ime i prezime" /></div>
-          <div><label for="tel">Telefon</label><input id="tel" name="tel" type="tel" required placeholder="061/xxx-xxxx" /></div>
+      <form class="contact" id="contactForm" action="https://api.web3forms.com/submit" method="POST">
+        <input type="hidden" name="access_key" value="f04753c5-1151-4a26-ba82-e582a31c7e53" />
+        <input type="hidden" name="subject" value="Novi upit — iznajmljivanjekontejnera.online" />
+        <input type="hidden" name="from_name" value="Iznajmljivanje kontejnera Novi Sad" />
+        <div style="display:none" aria-hidden="true">
+          <label for="botcheck">Ne popunjavajte ovo polje</label>
+          <input id="botcheck" type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" />
         </div>
-        <div><label for="lok">Lokacija</label><input id="lok" name="lok" required placeholder="Grad / adresa dostave" /></div>
-        <div><label for="por">Poruka</label><textarea id="por" name="por" placeholder="Ukratko opišite vrstu otpada i period najma"></textarea></div>
-        <button type="submit" class="btn btn-orange btn-lg">Pošalji upit</button>
+        <div class="row2">
+          <div><label for="ime">Ime</label><input id="ime" name="ime" required autocomplete="name" placeholder="Vaše ime i prezime" /></div>
+          <div><label for="tel">Telefon</label><input id="tel" name="tel" type="tel" required autocomplete="tel" inputmode="tel" placeholder="061/xxx-xxxx" /></div>
+        </div>
+        <div><label for="lok">Lokacija</label><input id="lok" name="lokacija" required autocomplete="street-address" placeholder="Grad / adresa dostave" /></div>
+        <div><label for="por">Poruka</label><textarea id="por" name="poruka" placeholder="Ukratko opišite vrstu otpada i period najma"></textarea></div>
+        <p id="formStatus" role="status" aria-live="polite" style="min-height:24px;text-align:center;font-weight:700"></p>
+        <button id="submitButton" type="submit" class="btn btn-orange btn-lg">Pošalji upit</button>
         <small style="color:var(--muted);text-align:center">Ili nas pozovite direktno na <a href="tel:+381612124519" style="color:var(--blue);font-weight:700">061/212-4519</a></small>
       </form>
     </div>
@@ -1163,6 +1171,42 @@ document.getElementById('yr').textContent=new Date().getFullYear();
 var h=document.getElementById('siteHeader');
 window.addEventListener('scroll',function(){h.classList.toggle('scrolled',window.scrollY>10)},{passive:true});
 document.querySelectorAll('#menu a').forEach(function(a){a.addEventListener('click',function(){document.getElementById('menu').classList.remove('open')})});
+
+var contactForm=document.getElementById('contactForm');
+if(contactForm){
+  contactForm.addEventListener('submit',async function(event){
+    event.preventDefault();
+    var button=document.getElementById('submitButton');
+    var status=document.getElementById('formStatus');
+    var originalText=button.textContent;
+    button.disabled=true;
+    button.textContent='Šaljem...';
+    status.textContent='';
+
+    try{
+      var response=await fetch(contactForm.action,{
+        method:'POST',
+        body:new FormData(contactForm),
+        headers:{'Accept':'application/json'}
+      });
+      var result=await response.json();
+      if(!response.ok||!result.success){throw new Error(result.message||'Slanje nije uspelo');}
+
+      status.style.color='#15803d';
+      status.textContent='✔ Poruka je uspešno poslata. Javićemo se uskoro.';
+      contactForm.reset();
+
+      window.dataLayer=window.dataLayer||[];
+      window.dataLayer.push({event:'contact_form_submit',form_name:'Iznajmljivanje kontejnera Novi Sad'});
+    }catch(error){
+      status.style.color='#b91c1c';
+      status.textContent='Slanje nije uspelo. Pozovite nas na 061/212-4519.';
+    }finally{
+      button.disabled=false;
+      button.textContent=originalText;
+    }
+  });
+}
 </script>
 </body>
 </html>
