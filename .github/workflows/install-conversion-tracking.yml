@@ -1,0 +1,104 @@
+name: Install conversion tracking
+
+on:
+  push:
+    paths:
+      - '.github/workflows/install-conversion-tracking.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install-tracking:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify and enhance Google Ads tracking
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+
+          required = [
+              "gtag('config', 'AW-18320037201');",
+              "gtag('event', 'conversion', {'send_to': 'AW-18320037201/a6M4CPLkp9EcENGq1p9E'});",
+          ]
+          missing = [item for item in required if item not in html]
+          if missing:
+              raise SystemExit(f'Missing required Google Ads tracking code: {missing}')
+
+          phone_tracking = r'''
+// Track every click-to-call link as a GA4/dataLayer event.
+// A separate Google Ads phone conversion action can later import this event
+// or supply its own conversion label without misclassifying calls as form leads.
+(function bindPhoneClickTracking(){
+  document.querySelectorAll('a[href^="tel:"]').forEach(function(link){
+    if(link.dataset.callTrackingBound === 'true') return;
+    link.dataset.callTrackingBound = 'true';
+
+    link.addEventListener('click', function(){
+      var phoneNumber=(link.getAttribute('href')||'').replace(/^tel:/,'');
+      var eventData={
+        phone_number:phoneNumber,
+        link_text:(link.textContent||'').trim(),
+        page_location:window.location.href,
+        transport_type:'beacon'
+      };
+
+      window.dataLayer=window.dataLayer||[];
+      window.dataLayer.push(Object.assign({event:'phone_click'},eventData));
+
+      if(typeof window.gtag === 'function'){
+        window.gtag('event','phone_click',eventData);
+      }
+    });
+  });
+})();
+'''
+
+          marker = "var contactForm=document.getElementById('contactForm');"
+          if 'bindPhoneClickTracking' not in html:
+              if marker not in html:
+                  raise SystemExit('Could not locate contact form script marker')
+              html = html.replace(marker, phone_tracking + "\n" + marker, 1)
+
+          old = """      window.dataLayer=window.dataLayer||[];
+      window.dataLayer.push({event:'contact_form_submit',form_name:'Iznajmljivanje kontejnera Novi Sad'});
+      gtag('event', 'conversion', {'send_to': 'AW-18320037201/a6M4CPLkp9EcENGq1p9E'});"""
+
+          new = """      window.dataLayer=window.dataLayer||[];
+      window.dataLayer.push({event:'contact_form_submit',form_name:'Iznajmljivanje kontejnera Novi Sad'});
+
+      // These events run only after Web3Forms confirms a successful submission.
+      if(typeof window.gtag === 'function'){
+        window.gtag('event','generate_lead',{
+          form_name:'Iznajmljivanje kontejnera Novi Sad',
+          transport_type:'beacon'
+        });
+        window.gtag('event','conversion',{
+          'send_to':'AW-18320037201/a6M4CPLkp9EcENGq1p9E',
+          'transport_type':'beacon'
+        });
+      }"""
+
+          if old in html:
+              html = html.replace(old, new, 1)
+          elif "window.gtag('event','generate_lead'" not in html:
+              raise SystemExit('Could not locate the successful form conversion block')
+
+          path.write_text(html, encoding='utf-8')
+          PY
+
+      - name: Commit tracking changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Track successful leads and phone clicks"
+            git push
+          fi
