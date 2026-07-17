@@ -1191,6 +1191,32 @@ var h=document.getElementById('siteHeader');
 window.addEventListener('scroll',function(){h.classList.toggle('scrolled',window.scrollY>10)},{passive:true});
 document.querySelectorAll('#menu a').forEach(function(a){a.addEventListener('click',function(){document.getElementById('menu').classList.remove('open')})});
 
+
+// Track every click-to-call link as a GA4/dataLayer event.
+(function bindPhoneClickTracking(){
+  document.querySelectorAll('a[href^="tel:"]').forEach(function(link){
+    if(link.dataset.callTrackingBound === 'true') return;
+    link.dataset.callTrackingBound = 'true';
+
+    link.addEventListener('click', function(){
+      var phoneNumber=(link.getAttribute('href')||'').replace(/^tel:/,'');
+      var eventData={
+        phone_number:phoneNumber,
+        link_text:(link.textContent||'').trim(),
+        page_location:window.location.href,
+        transport_type:'beacon'
+      };
+
+      window.dataLayer=window.dataLayer||[];
+      window.dataLayer.push(Object.assign({event:'phone_click'},eventData));
+
+      if(typeof window.gtag === 'function'){
+        window.gtag('event','phone_click',eventData);
+      }
+    });
+  });
+})();
+
 var contactForm=document.getElementById('contactForm');
 if(contactForm){
   contactForm.addEventListener('submit',async function(event){
@@ -1217,7 +1243,18 @@ if(contactForm){
 
       window.dataLayer=window.dataLayer||[];
       window.dataLayer.push({event:'contact_form_submit',form_name:'Iznajmljivanje kontejnera Novi Sad'});
-      gtag('event', 'conversion', {'send_to': 'AW-18320037201/a6M4CPLkp9EcENGq1p9E'});
+
+      // Fire lead events only after Web3Forms confirms success.
+      if(typeof window.gtag === 'function'){
+        window.gtag('event','generate_lead',{
+          form_name:'Iznajmljivanje kontejnera Novi Sad',
+          transport_type:'beacon'
+        });
+        window.gtag('event','conversion',{
+          send_to:'AW-18320037201/a6M4CPLkp9EcENGq1p9E',
+          transport_type:'beacon'
+        });
+      }
     }catch(error){
       status.style.color='#b91c1c';
       status.textContent='Slanje nije uspelo. Pozovite nas na 061/212-4519.';
