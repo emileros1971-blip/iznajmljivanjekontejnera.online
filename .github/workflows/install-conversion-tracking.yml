@@ -102,3 +102,5 @@ jobs:
             git commit -m "Track successful leads and phone clicks"
             git push
           fi
+
+# Triggered after initial workflow creation so GitHub Actions sees an existing workflow.
