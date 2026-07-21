@@ -1212,6 +1212,10 @@ document.querySelectorAll('#menu a').forEach(function(a){a.addEventListener('cli
 
       if(typeof window.gtag === 'function'){
         window.gtag('event','phone_click',eventData);
+        window.gtag('event','conversion',{
+          send_to:'AW-18320037201/Op1GCMyW_tMcENGq1p9E',
+          transport_type:'beacon'
+        });
       }
     });
   });
