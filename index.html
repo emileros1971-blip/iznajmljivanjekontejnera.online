@@ -1212,10 +1212,7 @@ document.querySelectorAll('#menu a').forEach(function(a){a.addEventListener('cli
 
       if(typeof window.gtag === 'function'){
         window.gtag('event','phone_click',eventData);
-        window.gtag('event','conversion',{
-          send_to:'AW-18320037201/Op1GCMyW_tMcENGq1p9E',
-          transport_type:'beacon'
-        });
+        gtag('event', 'conversion', {'send_to': 'AW-18320037201/Op1GCMyW_tMcENGq1p9E'});
       }
     });
   });
@@ -1249,16 +1246,10 @@ if(contactForm){
       window.dataLayer.push({event:'contact_form_submit',form_name:'Iznajmljivanje kontejnera Novi Sad'});
 
       // Fire lead events only after Web3Forms confirms success.
-      if(typeof window.gtag === 'function'){
-        window.gtag('event','generate_lead',{
-          form_name:'Iznajmljivanje kontejnera Novi Sad',
-          transport_type:'beacon'
-        });
-        window.gtag('event','conversion',{
-          send_to:'AW-18320037201/a6M4CPLkp9EcENGq1p9E',
-          transport_type:'beacon'
-        });
-      }
+      gtag('event', 'generate_lead', {
+        'form_name': 'Iznajmljivanje kontejnera Novi Sad'
+      });
+      gtag('event', 'conversion', {'send_to': 'AW-18320037201/a6M4CPLkp9EcENGq1p9E'});
     }catch(error){
       status.style.color='#b91c1c';
       status.textContent='Slanje nije uspelo. Pozovite nas na 061/212-4519.';
