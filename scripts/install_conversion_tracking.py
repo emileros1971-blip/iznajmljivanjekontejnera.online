@@ -7,70 +7,35 @@ PHONE_LABEL = "Op1GCMyW_tMcENGq1p9E"
 
 html = INDEX_PATH.read_text(encoding="utf-8")
 
-required_items = [
-    f"gtag('config', '{ADS_ID}');",
-    f"gtag('event', 'conversion', {{'send_to': '{ADS_ID}/{FORM_LABEL}'}});",
-]
-missing = [item for item in required_items if item not in html]
-if missing:
-    raise SystemExit(f"Missing required Google Ads tracking code: {missing}")
+if f"gtag('config', '{ADS_ID}');" not in html:
+    raise SystemExit("Missing Google Ads base tag configuration")
 
-phone_tracking = r'''
-// Track every click-to-call link as a GA4/dataLayer event.
-(function bindPhoneClickTracking(){
-  document.querySelectorAll('a[href^="tel:"]').forEach(function(link){
-    if(link.dataset.callTrackingBound === 'true') return;
-    link.dataset.callTrackingBound = 'true';
-
-    link.addEventListener('click', function(){
-      var phoneNumber=(link.getAttribute('href')||'').replace(/^tel:/,'');
-      var eventData={
-        phone_number:phoneNumber,
-        link_text:(link.textContent||'').trim(),
-        page_location:window.location.href,
-        transport_type:'beacon'
-      };
-
-      window.dataLayer=window.dataLayer||[];
-      window.dataLayer.push(Object.assign({event:'phone_click'},eventData));
-
-      if(typeof window.gtag === 'function'){
-        window.gtag('event','phone_click',eventData);
-      }
-    });
-  });
-})();
-'''
-
-marker = "var contactForm=document.getElementById('contactForm');"
-if "bindPhoneClickTracking" not in html:
-    if marker not in html:
-        raise SystemExit("Could not locate contact form script marker")
-    html = html.replace(marker, phone_tracking + "\n" + marker, 1)
-
-phone_conversion_snippet = f"""        window.gtag('event','conversion',{{
+# Keep the existing GA4/dataLayer phone-click event, but use Google's standard
+# Google Ads conversion event snippet without forcing Beacon transport.
+old_phone_conversion = f"""        window.gtag('event','conversion',{{
           send_to:'{ADS_ID}/{PHONE_LABEL}',
           transport_type:'beacon'
         }});"""
+standard_phone_conversion = (
+    f"        gtag('event', 'conversion', {{'send_to': '{ADS_ID}/{PHONE_LABEL}'}});"
+)
 
-if phone_conversion_snippet not in html:
+if old_phone_conversion in html:
+    html = html.replace(old_phone_conversion, standard_phone_conversion, 1)
+elif standard_phone_conversion not in html:
     phone_event_line = "        window.gtag('event','phone_click',eventData);"
     if phone_event_line not in html:
         raise SystemExit("Could not locate the phone-click event line")
     html = html.replace(
         phone_event_line,
-        phone_event_line + "\n" + phone_conversion_snippet,
+        phone_event_line + "\n" + standard_phone_conversion,
         1,
     )
 
-old_form_block = f"""      window.dataLayer=window.dataLayer||[];
-      window.dataLayer.push({{event:'contact_form_submit',form_name:'Iznajmljivanje kontejnera Novi Sad'}});
-      gtag('event', 'conversion', {{'send_to': '{ADS_ID}/{FORM_LABEL}'}});"""
-
-new_form_block = f"""      window.dataLayer=window.dataLayer||[];
-      window.dataLayer.push({{event:'contact_form_submit',form_name:'Iznajmljivanje kontejnera Novi Sad'}});
-
-      // Fire lead events only after Web3Forms confirms success.
+# The form is submitted with fetch(), so the conversion must fire only after
+# Web3Forms confirms success. Use the standard gtag conversion event snippet;
+# Tag Assistant was not detecting the previous forced-beacon implementation.
+old_form_tracking = f"""      // Fire lead events only after Web3Forms confirms success.
       if(typeof window.gtag === 'function'){{
         window.gtag('event','generate_lead',{{
           form_name:'Iznajmljivanje kontejnera Novi Sad',
@@ -82,18 +47,30 @@ new_form_block = f"""      window.dataLayer=window.dataLayer||[];
         }});
       }}"""
 
-if old_form_block in html:
-    html = html.replace(old_form_block, new_form_block, 1)
-elif "window.gtag('event','generate_lead'" not in html:
-    raise SystemExit("Could not locate the successful form conversion block")
+standard_form_tracking = f"""      // Fire lead events only after Web3Forms confirms success.
+      gtag('event', 'generate_lead', {{
+        'form_name': 'Iznajmljivanje kontejnera Novi Sad'
+      }});
+      gtag('event', 'conversion', {{'send_to': '{ADS_ID}/{FORM_LABEL}'}});"""
 
-final_required_items = [
-    f"send_to:'{ADS_ID}/{FORM_LABEL}'",
-    f"send_to:'{ADS_ID}/{PHONE_LABEL}'",
+if old_form_tracking in html:
+    html = html.replace(old_form_tracking, standard_form_tracking, 1)
+elif standard_form_tracking not in html:
+    # Also support the original one-line implementation if this installer is
+    # run against an older checkout.
+    original_form_conversion = (
+        f"      gtag('event', 'conversion', {{'send_to': '{ADS_ID}/{FORM_LABEL}'}});"
+    )
+    if original_form_conversion not in html:
+        raise SystemExit("Could not locate the successful form conversion block")
+
+required_after = [
+    f"gtag('event', 'conversion', {{'send_to': '{ADS_ID}/{FORM_LABEL}'}});",
+    f"gtag('event', 'conversion', {{'send_to': '{ADS_ID}/{PHONE_LABEL}'}});",
 ]
-final_missing = [item for item in final_required_items if item not in html]
-if final_missing:
-    raise SystemExit(f"Tracking installation incomplete: {final_missing}")
+missing_after = [item for item in required_after if item not in html]
+if missing_after:
+    raise SystemExit(f"Tracking fix incomplete: {missing_after}")
 
 INDEX_PATH.write_text(html, encoding="utf-8")
-print("Google Ads form and website phone-click conversions installed and verified.")
+print("Google Ads form and phone-click conversion snippets standardized.")
